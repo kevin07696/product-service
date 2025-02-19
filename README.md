@@ -91,7 +91,7 @@ grpcurl -plaintext localhost:50051 list
 
 ```
 
-You can also list the handlers available in the a GRPC service:
+You can also list the handlers available in the GRPC service:
 
 ```bash
 
