@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+option go_package = "./generated";
+
+
+enum ProductCategory {
+    CATEGORY_UNSPECIFIED = 0;
+    CATEGORY_CLOTHING = 1;
+    CATEGORY_BAGS = 2;
+}
+
+enum ProductSort {
+    SORT_UNSPECIFIED = 0;
+    SORT_TIMESTAMP = 1;
+    SORT_RATING = 2;
+    SORT_PRICE = 3;
+}
+
+enum ProductStock {
+    STOCK_UNSPECIFIED = 0;
+    STOCK_IN = 1;
+    STOCK_OUT = 2;
+}
+
+message ProductSummaryRequest {
+    ProductSort Sort = 1;
+    ProductCategory Category = 2;
+    ProductStock Stock = 3;
+    uint32 MinPrice = 4;
+    uint32 MaxPrice = 5;
+    bool Desc = 6;
+}
+
+message ProductSummary {
+    uint32 ID = 1;          
+	string Name = 2;       
+	string ThumbnailURL = 3;
+	string Price = 4;      
+}
+
+message ProductSummaryResponse {
+    repeated ProductSummary products = 1;
+}
+
+message ProductDetailRequest {
+    uint32 ID = 1;
+}
+
+message ProductDetailResponse {
+    uint32 ID = 1;         
+	uint32 Quantity = 2;     
+    ProductCategory Category = 3; 
+	string Price = 4;      
+	string Name = 5;       
+	string ImagesURLs = 6;
+	string Description = 7;
+}
+
+service Product {
+    rpc FilterProducts(ProductSummaryRequest) returns (ProductSummaryResponse);
+    rpc GetDetails(ProductDetailRequest) returns (ProductDetailResponse);
+}
