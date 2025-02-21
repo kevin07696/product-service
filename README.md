@@ -127,7 +127,7 @@ grpcurl -plaintext -d '{"Sort":3,"Category":2,"Stock":0,"MinPrice":0,"MaxPrice":
   "MinPrice": 0,
   "MaxPrice": 100,
   "Desc": false
-}**
+}
 ```
 
 **Response Body**:
