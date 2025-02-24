@@ -7,4 +7,5 @@ type ProductRepositor interface {
 	ReadProductSummaries(request *generated.ProductSummaryRequest) ([]ProductSummary, StatusCode)
 	ReadProductDetail(productID uint) (ProductDetail, StatusCode)
 	WriteProducts() StatusCode
+	ReadCategories() ([]string, StatusCode)
 }

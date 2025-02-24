@@ -7,6 +7,7 @@ import (
 
 type Reader interface {
 	ReadProductSummaries(request *generated.ProductSummaryRequest) ([]domain.ProductSummary, domain.StatusCode)
+	ReadCategories() ([]string, domain.StatusCode)
 }
 
 type ProductServicer interface {

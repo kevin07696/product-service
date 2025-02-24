@@ -21,6 +21,7 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	Product_FilterProducts_FullMethodName = "/Product/FilterProducts"
 	Product_GetDetails_FullMethodName     = "/Product/GetDetails"
+	Product_GetCategories_FullMethodName  = "/Product/GetCategories"
 )
 
 // ProductClient is the client API for Product service.
@@ -29,6 +30,7 @@ const (
 type ProductClient interface {
 	FilterProducts(ctx context.Context, in *ProductSummaryRequest, opts ...grpc.CallOption) (*ProductSummaryResponse, error)
 	GetDetails(ctx context.Context, in *ProductDetailRequest, opts ...grpc.CallOption) (*ProductDetailResponse, error)
+	GetCategories(ctx context.Context, in *CategoryRequest, opts ...grpc.CallOption) (*CategoryResponse, error)
 }
 
 type productClient struct {
@@ -59,12 +61,23 @@ func (c *productClient) GetDetails(ctx context.Context, in *ProductDetailRequest
 	return out, nil
 }
 
+func (c *productClient) GetCategories(ctx context.Context, in *CategoryRequest, opts ...grpc.CallOption) (*CategoryResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CategoryResponse)
+	err := c.cc.Invoke(ctx, Product_GetCategories_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ProductServer is the server API for Product service.
 // All implementations must embed UnimplementedProductServer
 // for forward compatibility.
 type ProductServer interface {
 	FilterProducts(context.Context, *ProductSummaryRequest) (*ProductSummaryResponse, error)
 	GetDetails(context.Context, *ProductDetailRequest) (*ProductDetailResponse, error)
+	GetCategories(context.Context, *CategoryRequest) (*CategoryResponse, error)
 	mustEmbedUnimplementedProductServer()
 }
 
@@ -80,6 +93,9 @@ func (UnimplementedProductServer) FilterProducts(context.Context, *ProductSummar
 }
 func (UnimplementedProductServer) GetDetails(context.Context, *ProductDetailRequest) (*ProductDetailResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetDetails not implemented")
+}
+func (UnimplementedProductServer) GetCategories(context.Context, *CategoryRequest) (*CategoryResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetCategories not implemented")
 }
 func (UnimplementedProductServer) mustEmbedUnimplementedProductServer() {}
 func (UnimplementedProductServer) testEmbeddedByValue()                 {}
@@ -138,6 +154,24 @@ func _Product_GetDetails_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Product_GetCategories_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CategoryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProductServer).GetCategories(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Product_GetCategories_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProductServer).GetCategories(ctx, req.(*CategoryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Product_ServiceDesc is the grpc.ServiceDesc for Product service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -152,6 +186,10 @@ var Product_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetDetails",
 			Handler:    _Product_GetDetails_Handler,
+		},
+		{
+			MethodName: "GetCategories",
+			Handler:    _Product_GetCategories_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

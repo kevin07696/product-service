@@ -28,20 +28,19 @@ func (r ProductRepository) Migrate() {
 			slog.Error("Failed to migrate table products.", "error", err)
 		}
 	}
-
 }
 
 func (r ProductRepository) ReadProductSummaries(request *generated.ProductSummaryRequest) ([]ProductSummary, StatusCode) {
 	query := r.db.Table(Product{}.TableName())
 
-	// Apply category filter if specified
-	if request.Category != generated.ProductCategory_CATEGORY_UNSPECIFIED {
-		query = query.Where("category = ?", request.Category.String())
-	}
-
 	// Apply stock filter if specified
 	if request.Stock != generated.ProductStock_STOCK_UNSPECIFIED {
 		query = query.Where("in_stock = ?", request.Stock == generated.ProductStock_STOCK_IN)
+	}
+
+	// Apply category filter if specified
+	if len(request.Categories) > 0 {
+		query = query.Where("category IN ?", request.Categories)
 	}
 
 	// Apply price range filter
@@ -54,8 +53,6 @@ func (r ProductRepository) ReadProductSummaries(request *generated.ProductSummar
 	switch request.Sort {
 	case generated.ProductSort_SORT_PRICE:
 		sortField = "price"
-	case generated.ProductSort_SORT_RATING:
-		sortField = "rating"
 	default:
 		sortField = "created_at"
 	}
@@ -83,10 +80,31 @@ func (r ProductRepository) ReadProductDetail(productID uint) (detail ProductDeta
 	var ok bool
 
 	result := r.db.Model(&Product{}).Where(gorm.Model{ID: productID}).Take(&detail)
-	status, ok = r.errorHandler[result.Error]
-	if !ok {
-		status = StatusInternal
+	if result.Error != nil {
+		slog.Error("Failed to query product details", "id", productID, "error", result.Error)
+		status, ok = r.errorHandler[result.Error]
+		if !ok {
+			status = StatusInternal
+		}
 	}
+	return
+}
+
+func (r ProductRepository) ReadCategories() (categories []string, status StatusCode) {
+	result := r.db.Table(Product{}.TableName()).Distinct("category").Find(&categories)
+	if result.Error != nil {
+		slog.Error("Failed to query categories", "error", result.Error)
+
+		var ok bool
+		status, ok = r.errorHandler[result.Error]
+		if !ok {
+			status = StatusInternal
+		}
+		return // Ensures we don't fall through to setting StatusOK
+	}
+
+	// Explicitly set status on success
+	status = StatusOK
 	return
 }
 
@@ -94,73 +112,81 @@ func (r ProductRepository) WriteProducts() StatusCode {
 	products := []Product{
 		{
 			Name:         "Men's T-Shirt",
-			Category:     generated.ProductCategory_CATEGORY_CLOTHING.String(),
-			Price:        19.99,
+			Category:     "Tops",
+			Price:        1999,
 			ThumbnailURL: "https://example.com/images/tshirt.jpg",
 			Description:  "Cotton crew-neck t-shirt available in multiple colors.",
+			ImagesURLs:   []string{"https://example.com/images/tshirt.jpg", "https://example.com/images/tshirt.jpg", "https://example.com/images/tshirt.jpg", "https://example.com/images/tshirt.jpg"},
 			Rating:       4.5,
 			InStock:      true,
 		},
 		{
 			Name:         "Women's Hoodie",
-			Category:     generated.ProductCategory_CATEGORY_CLOTHING.String(),
-			Price:        39.99,
+			Category:     "Tops",
+			Price:        3999,
 			ThumbnailURL: "https://example.com/images/hoodie.jpg",
 			Description:  "Cozy fleece hoodie with front pockets.",
+			ImagesURLs:   []string{"https://example.com/images/tshirt.jpg", "https://example.com/images/tshirt.jpg", "https://example.com/images/tshirt.jpg", "https://example.com/images/tshirt.jpg"},
 			Rating:       4.7,
 			InStock:      true,
 		},
 		{
 			Name:         "Leather Jacket",
-			Category:     generated.ProductCategory_CATEGORY_CLOTHING.String(),
-			Price:        129.99,
+			Category:     "Tops",
+			Price:        12999,
 			ThumbnailURL: "https://example.com/images/jacket.jpg",
 			Description:  "Premium leather jacket for a stylish look.",
+			ImagesURLs:   []string{"https://example.com/images/tshirt.jpg", "https://example.com/images/tshirt.jpg", "https://example.com/images/tshirt.jpg", "https://example.com/images/tshirt.jpg"},
 			Rating:       4.6,
 			InStock:      false,
 		},
 		{
 			Name:         "Running Shoes",
-			Category:     generated.ProductCategory_CATEGORY_CLOTHING.String(),
-			Price:        79.99,
+			Category:     "Shoes",
+			Price:        7999,
 			ThumbnailURL: "https://example.com/images/shoes.jpg",
 			Description:  "Lightweight and comfortable running shoes.",
+			ImagesURLs:   []string{"https://example.com/images/tshirt.jpg", "https://example.com/images/tshirt.jpg", "https://example.com/images/tshirt.jpg", "https://example.com/images/tshirt.jpg"},
 			Rating:       4.8,
 			InStock:      true,
 		},
 		{
 			Name:         "Casual Backpack",
-			Category:     generated.ProductCategory_CATEGORY_BAGS.String(),
-			Price:        49.99,
+			Category:     "Backpack",
+			Price:        4999,
 			ThumbnailURL: "https://example.com/images/backpack.jpg",
 			Description:  "Durable backpack with multiple compartments.",
+			ImagesURLs:   []string{"https://example.com/images/tshirt.jpg", "https://example.com/images/tshirt.jpg", "https://example.com/images/tshirt.jpg", "https://example.com/images/tshirt.jpg"},
 			Rating:       4.5,
 			InStock:      true,
 		},
 		{
 			Name:         "Leather Handbag",
-			Category:     generated.ProductCategory_CATEGORY_BAGS.String(),
-			Price:        89.99,
+			Category:     "Handbag",
+			Price:        8999,
 			ThumbnailURL: "https://example.com/images/handbag.jpg",
 			Description:  "Elegant leather handbag for everyday use.",
+			ImagesURLs:   []string{"https://example.com/images/tshirt.jpg", "https://example.com/images/tshirt.jpg", "https://example.com/images/tshirt.jpg", "https://example.com/images/tshirt.jpg"},
 			Rating:       4.7,
 			InStock:      true,
 		},
 		{
 			Name:         "Travel Duffel Bag",
-			Category:     generated.ProductCategory_CATEGORY_BAGS.String(),
-			Price:        69.99,
+			Category:     "Bag",
+			Price:        6999,
 			ThumbnailURL: "https://example.com/images/duffel.jpg",
 			Description:  "Spacious duffel bag for travel and gym.",
+			ImagesURLs:   []string{"https://example.com/images/tshirt.jpg", "https://example.com/images/tshirt.jpg", "https://example.com/images/tshirt.jpg", "https://example.com/images/tshirt.jpg"},
 			Rating:       4.6,
 			InStock:      false,
 		},
 		{
 			Name:         "Messenger Bag",
-			Category:     generated.ProductCategory_CATEGORY_BAGS.String(),
-			Price:        59.99,
+			Category:     "Bag",
+			Price:        5999,
 			ThumbnailURL: "https://example.com/images/messenger.jpg",
 			Description:  "Stylish and practical messenger bag for work and casual use.",
+			ImagesURLs:   []string{"https://example.com/images/tshirt.jpg", "https://example.com/images/tshirt.jpg", "https://example.com/images/tshirt.jpg", "https://example.com/images/tshirt.jpg"},
 			Rating:       4.4,
 			InStock:      true,
 		},

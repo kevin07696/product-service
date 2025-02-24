@@ -9,13 +9,13 @@ import (
 type Product struct {
 	gorm.Model
 	Name         string
-	Category     string  `gorm:"index"`
-	Price        float32 `gorm:"index"`
+	Category     string `gorm:"index"`
+	Price        uint32 `gorm:"index"`
 	ThumbnailURL string
-	ImagesURLs   []string `gorm:"type:text"` 
 	Description  string
 	Rating       float32   `gorm:"index"`
 	InStock      bool      `gorm:"index"`
+	ImagesURLs   []string  `gorm:"serializer:json"`
 	CreatedAt    time.Time `gorm:"index"`
 }
 
@@ -26,17 +26,18 @@ func (Product) TableName() string {
 type ProductSummary struct {
 	ID           uint
 	Name         string
-	Price        float32
+	Rating       float32 `gorm:"index"`
+	Price        uint32
 	ThumbnailURL string
 }
 
 type ProductDetail struct {
 	ID          uint
+	Price       uint32
+	Rating      float32 `gorm:"index"`
 	Name        string
 	Category    string
-	Price       float32
-	ImagesURLs  []string
 	Description string
-	Stock       uint
+	ImagesURLs  []string `gorm:"serializer:json"`
 	CreatedAt   time.Time
 }
