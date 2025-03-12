@@ -2,14 +2,11 @@ package handlers
 
 import (
 	"github.com/kevin07696/produce-service/domain"
-	"github.com/kevin07696/produce-service/generated"
+	"gorm.io/datatypes"
 )
 
 type Reader interface {
-	ReadProductSummaries(request *generated.ProductSummaryRequest) ([]domain.ProductSummary, domain.StatusCode)
+	ReadProductSummaries() ([]domain.ProductSummary, domain.StatusCode)
+	ReadProductDetail(productID datatypes.UUID) (domain.ProductDetail, domain.StatusCode)
 	ReadCategories() ([]string, domain.StatusCode)
-}
-
-type ProductServicer interface {
-	GetProductDetail(request *generated.ProductDetailRequest) (domain.ProductDetail, domain.StatusCode)
 }

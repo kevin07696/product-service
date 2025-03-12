@@ -3,20 +3,30 @@ package domain
 import (
 	"time"
 
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
+type Model struct {
+	ID        datatypes.UUID `gorm:"type:uuid;primaryKey"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	DeletedAt gorm.DeletedAt `gorm:"index"`
+}
+
 type Product struct {
-	gorm.Model
-	Name         string
-	Category     string `gorm:"index"`
-	Price        uint32 `gorm:"index"`
-	ThumbnailURL string
-	Description  string
-	Rating       float32   `gorm:"index"`
-	InStock      bool      `gorm:"index"`
-	ImagesURLs   []string  `gorm:"serializer:json"`
-	CreatedAt    time.Time `gorm:"index"`
+	Model
+	Name         string         `gorm:"type:text;not null"`
+	ThumbnailUrl string         `gorm:"type:text;not null"`
+	CategoryName string         `gorm:"type:text;not null"`
+	Description  string         `gorm:"type:text;not null"`
+	CentPrice    uint32         `gorm:"type:uint;default:0"`
+	AmountSold   uint32         `gorm:"type:uint;default:0"`
+	InStock      bool           `gorm:"type:boolean;default:false"`
+	Rating       float32        `gorm:"type:numeric;default:0"`
+	Options      datatypes.JSON `gorm:"type:jsonb"`
+	MainOption   datatypes.JSON `gorm:"type:jsonb"`
+	Attributes   datatypes.JSON `gorm:"type:jsonb"`
 }
 
 func (Product) TableName() string {
@@ -24,20 +34,26 @@ func (Product) TableName() string {
 }
 
 type ProductSummary struct {
-	ID           uint
-	Name         string
-	Rating       float32 `gorm:"index"`
-	Price        uint32
-	ThumbnailURL string
+	ID           string    `gorm:"column:id"`
+	Name         string    `gorm:"column:name"`
+	ThumbnailUrl string    `gorm:"column:thumbnail_url"`
+	CategoryName string    `gorm:"column:category_name"`
+	CentPrice    uint32    `gorm:"column:cent_price"`
+	InStock      bool      `gorm:"column:in_stock"`
+	Rating       float32   `gorm:"column:rating"`
+	AmountSold   uint32    `gorm:"column:amount_sold"`
+	CreatedAt    time.Time `gorm:"column:created_at"`
 }
 
 type ProductDetail struct {
-	ID          uint
-	Price       uint32
-	Rating      float32 `gorm:"index"`
-	Name        string
-	Category    string
-	Description string
-	ImagesURLs  []string `gorm:"serializer:json"`
-	CreatedAt   time.Time
+	ID           string         `gorm:"column:id"`
+	Name         string         `gorm:"column:name"`
+	CategoryName string         `gorm:"column:category_name"`
+	Description  string         `gorm:"column:description"`
+	CentPrice    uint32         `gorm:"column:cent_price"`
+	Rating       float32        `gorm:"column:rating"`
+	Attributes   datatypes.JSON `gorm:"type:jsonb"`
+	MainOption   datatypes.JSON `gorm:"type:jsonb"`
+	Options      datatypes.JSON `gorm:"type:jsonb"`
+	CreatedAt    time.Time      `gorm:"column:created_at"`
 }

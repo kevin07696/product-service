@@ -17,11 +17,10 @@ import (
 func main() {
 
 	var (
-		repository       domain.ProductRepositor
-		productService   handlers.ProductServicer
-		productHandler   handlers.ProductHandler
-		healthHandler    handlers.HealthHandler
-		server           *handlers.Server
+		repository     domain.ProductRepository
+		productHandler handlers.ReadProductHandler
+		healthHandler  handlers.HealthHandler
+		server         *handlers.Server
 	)
 
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
@@ -32,14 +31,12 @@ func main() {
 	repository = domain.NewProductRepository(db)
 	repository.Migrate()
 
-	productService = domain.NewProductService(repository)
-
-	productHandler = handlers.NewProductHandler(productService, repository)
+	productHandler = handlers.NewReadProductHandler(repository)
 	healthHandler = handlers.NewHealthHandler(30)
 
 	server = handlers.NewServer()
 
-	generated.RegisterProductServer(server.Server(), productHandler)
+	generated.RegisterProductReadServiceServer(server.Server(), productHandler)
 	health.RegisterHealthServer(server.Server(), &healthHandler)
 
 	reflection.Register(server.Server())

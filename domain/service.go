@@ -1,25 +1,11 @@
 package domain
 
-import "github.com/kevin07696/produce-service/generated"
-
 type ProductService struct {
-	repo      ProductRepositor
+	repo ProductWriter
 }
 
-func NewProductService(repo ProductRepositor) ProductService {
+func NewProductService(repo ProductWriter) ProductService {
 	return ProductService{
-		repo:      repo,
+		repo: repo,
 	}
 }
-
-func (s ProductService) GetProductDetail(request *generated.ProductDetailRequest) (productDetail ProductDetail, status StatusCode) {
-	id := uint(request.ID)
-
-	productDetail, status = s.repo.ReadProductDetail(id)
-	if status > 0 {
-		return
-	}
-
-	return
-}
-
