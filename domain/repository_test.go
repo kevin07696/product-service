@@ -35,7 +35,7 @@ func SetupMockDB(t *testing.T) (*gorm.DB, sqlmock.Sqlmock) {
 	)
 
 	// Replace GORM's underlying database driver with the mock connection
-	gDB, err := gorm.Open(postgres.New(postgres.Config{
+	gormDB, err := gorm.Open(postgres.New(postgres.Config{
 		Conn: db,
 	}), &gorm.Config{
 		Logger: gormLogger, // Enable GORM logger
@@ -44,7 +44,7 @@ func SetupMockDB(t *testing.T) (*gorm.DB, sqlmock.Sqlmock) {
 		t.Fatalf("Failed to open GORM connection: %v", err)
 	}
 
-	return gDB, mock
+	return gormDB, mock
 }
 
 func TestTableMigration(t *testing.T) {
@@ -158,7 +158,7 @@ func TestProductRepository_ReadProductSummaries(t *testing.T) {
 			rows := sqlmock.NewRows([]string{"id", "name", "thumbnail_url", "category_name", "cent_price", "in_stock", "rating", "amount_sold", "created_at"}).
 				AddRows(tc.Rows...)
 
-			mock.ExpectQuery(`SELECT .* FROM "products" WHERE "products"."deleted_at" IS NULL LIMIT .*`).
+			mock.ExpectQuery(`SELECT .* FROM "products" LIMIT .*`).
 				WithArgs(tc.Arguments...).WillReturnRows(rows)
 
 			// Run the query for product summaries.
@@ -304,7 +304,7 @@ func TestProductRepository_ReadCategories(t *testing.T) {
 			rows := sqlmock.NewRows([]string{"category_name"}).
 				AddRows(tc.Rows...)
 
-			mock.ExpectQuery(`SELECT DISTINCT "category_name" FROM "products" LIMIT .*`).
+			mock.ExpectQuery(`SELECT DISTINCT category_name FROM "products" LIMIT .*`).
 				WithArgs(tc.Arguments...).WillReturnRows(rows)
 
 			// Run the query for product categories.
@@ -320,3 +320,226 @@ func TestProductRepository_ReadCategories(t *testing.T) {
 	}
 }
 
+func TestWriteProduct(t *testing.T) {
+	product := domain.Product{
+		Model: domain.Model{
+			ID: datatypes.UUID(uuid.New()),
+		},
+		Name:         "Classic Jeans",
+		ThumbnailUrl: "https://my-bucket.s3.us-east-1.amazonaws.com/images/classic-jeans.jpg",
+		Description:  "These are really nice jeans.",
+		CentPrice:    5000,
+		InStock:      true,
+		Rating:       0.75,
+		AmountSold:   6,
+		MainOption:   datatypes.JSON(`{ name: pattern, options: [ { value: Striped, image_urls: [https://example.com/striped-pattern1.jpg, https://example.com/striped-pattern2.jpg] } ] }`),
+		Options:      datatypes.JSON(`{ options: [ { name: size, options: [xs, s, m, lg] } ] }`),
+		Attributes:   datatypes.JSON(`{ attributes: { material: 100% Cotton, care_instructions: Machine wash cold. Tumble dry low., size_chart: { xs: { bust: 30-32 inches, waist: 24-26 inches, hips: 33-35 inches } } } }`),
+		CategoryName: "pants",
+	}
+
+	testCases := []struct {
+		Name         string
+		ErrorMock    error
+		ExpectStatus domain.StatusCode
+	}{
+		{
+			Name:         "Success_ReturnsStatusOK",
+			ErrorMock:    nil,
+			ExpectStatus: domain.StatusOK,
+		},
+		{
+			Name:         "Fails_ReturnsDuplicateKey",
+			ErrorMock:    gorm.ErrDuplicatedKey,
+			ExpectStatus: domain.StatusDuplicateKey,
+		},
+		{
+			Name:         "FailsUnexpectedly_ReturnsInternal",
+			ErrorMock:    errors.New("Unexpected Error"),
+			ExpectStatus: domain.StatusInternal,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			// setup
+			db, mock := SetupMockDB(t)
+
+			// mock query
+			mock.ExpectBegin()
+
+			// Fix: Use sqlmock.AnyArg() for the ID parameter to match any UUID
+			query := mock.ExpectExec(`INSERT INTO "products" \("id","created_at","updated_at","deleted_at","name","thumbnail_url","category_name","description","cent_price","amount_sold","in_stock","rating","options","main_option","attributes"\) VALUES \(\$1,\$2,\$3,\$4,\$5,\$6,\$7,\$8,\$9,\$10,\$11,\$12,\$13,\$14,\$15\)`).
+				WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), product.Name, product.ThumbnailUrl, product.CategoryName, product.Description, product.CentPrice, product.AmountSold, product.InStock, product.Rating, product.Options, product.MainOption, product.Attributes)
+
+			if tc.ErrorMock == nil {
+				query.WillReturnResult(sqlmock.NewResult(1, 1))
+				mock.ExpectCommit()
+			} else {
+				query.WillReturnError(tc.ErrorMock)
+				mock.ExpectRollback()
+			}
+
+			// call function
+			repository := domain.NewProductRepository(db, 1)
+			status := repository.WriteProduct(&product)
+
+			// assert function expectations
+			assert.Equal(t, tc.ExpectStatus, status)
+			assert.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}
+
+func TestUpdateProduct(t *testing.T) {
+	product := domain.Product{
+		Model: domain.Model{
+			ID: datatypes.UUID(uuid.New()),
+		},
+		Name:       "Product 1",
+		Attributes: datatypes.JSON(`{ attributes: { material: 100% Cotton, care_instructions: Machine wash cold. Tumble dry low., size_chart: { xs: { bust: 30-32 inches, waist: 24-26 inches, hips: 33-35 inches } } } }`),
+	}
+
+	testCases := []struct {
+		Name              string
+		ProductId         string
+		ProductUpdates    domain.Product
+		ErrorMock         error
+		ExpectedExecution string
+		ExpectedArguments []driver.Value
+		ExpectedStatus    domain.StatusCode
+	}{
+		{
+			Name:              "Success_ReturnStatusOK",
+			ProductId:         "fbb6e4ab-8569-4c7f-bd8d-d754bf44bb30",
+			ProductUpdates:    domain.Product{Attributes: product.Attributes},
+			ExpectedExecution: `UPDATE "products" SET "updated_at"=\$1,"attributes"=\$2 WHERE id = \$3 AND "products"."deleted_at" IS NULL`,
+			ExpectedArguments: []driver.Value{sqlmock.AnyArg(), product.Attributes, "fbb6e4ab-8569-4c7f-bd8d-d754bf44bb30"},
+			ErrorMock:         nil,
+			ExpectedStatus:    domain.StatusOK,
+		},
+		{
+			Name:              "Fails_ReturnDuplicateKey",
+			ProductId:         "e838ab0e-d398-42a1-8acf-f3b8f6330812",
+			ProductUpdates:    domain.Product{Name: product.Name},
+			ExpectedExecution: `UPDATE "products" SET "updated_at"=\$1,"name"=\$2 WHERE id = \$3 AND "products"."deleted_at" IS NULL`,
+			ExpectedArguments: []driver.Value{sqlmock.AnyArg(), product.Name, "e838ab0e-d398-42a1-8acf-f3b8f6330812"},
+			ErrorMock:         gorm.ErrDuplicatedKey,
+			ExpectedStatus:    domain.StatusDuplicateKey,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			db, mock := SetupMockDB(t)
+
+			mock.ExpectBegin()
+
+			exec := mock.ExpectExec(tc.ExpectedExecution).WithArgs(tc.ExpectedArguments...)
+			if tc.ErrorMock == nil {
+				exec.WillReturnResult(sqlmock.NewResult(0, 1))
+				mock.ExpectCommit()
+			} else {
+				exec.WillReturnError(tc.ErrorMock)
+				mock.ExpectRollback()
+			}
+
+			repository := domain.NewProductRepository(db, 1)
+			status := repository.UpdateProduct(datatypes.UUID(uuid.MustParse(tc.ProductId)), tc.ProductUpdates)
+
+			assert.NoError(t, mock.ExpectationsWereMet())
+			assert.Equal(t, tc.ExpectedStatus, status)
+		})
+	}
+}
+
+func TestDeleteProduct(t *testing.T) {
+	testCases := []struct {
+		Name           string
+		ErrorMock      error
+		ExpectedStatus domain.StatusCode
+	}{
+		{
+			Name:           "Success",
+			ExpectedStatus: domain.StatusOK,
+		},
+		{
+			Name:           "Fail_ReturnsInternal",
+			ErrorMock:      errors.New(""),
+			ExpectedStatus: domain.StatusInternal,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			db, mock := SetupMockDB(t)
+
+			productId := datatypes.UUID(uuid.New())
+
+			mock.ExpectBegin()
+
+			exec := mock.ExpectExec(`UPDATE "products" SET "deleted_at"=\$1 WHERE id = \$2 AND "products"."deleted_at" IS NULL`).
+				WithArgs(sqlmock.AnyArg(), productId)
+
+			if tc.ErrorMock == nil {
+				exec.WillReturnResult(sqlmock.NewResult(1, 1))
+				mock.ExpectCommit()
+			} else {
+				exec.WillReturnError(tc.ErrorMock)
+				mock.ExpectRollback()
+			}
+
+			repository := domain.NewProductRepository(db, 1)
+			status := repository.DeleteProduct(productId)
+
+			assert.Equal(t, tc.ExpectedStatus, status)
+			assert.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}
+
+func TestRecoverProduct(t *testing.T) {
+	testCases := []struct {
+		Name           string
+		ProductId      string
+		ErrorMock      error
+		ExpectedStatus domain.StatusCode
+	}{
+		{
+			Name:           "Success_ReturnStatusOK",
+			ProductId:      "354c6abe-89c4-46dd-b51c-d1b9c20dac4b",
+			ErrorMock:      nil,
+			ExpectedStatus: domain.StatusOK,
+		},
+		{
+			Name:           "Fails_ReturnUnknown",
+			ProductId:      "354c6abe-89c4-46dd-b51c-d1b9c20dac4b",
+			ErrorMock:      errors.New("Unknown Error"),
+			ExpectedStatus: domain.StatusInternal,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			db, mock := SetupMockDB(t)
+
+			mock.ExpectBegin()
+
+			exec := mock.ExpectExec(`UPDATE "products" SET "deleted_at"=\$1 WHERE id = \$2`).
+				WithArgs(nil, "354c6abe-89c4-46dd-b51c-d1b9c20dac4b")
+			if tc.ErrorMock == nil {
+				exec.WillReturnResult(sqlmock.NewResult(0, 1))
+				mock.ExpectCommit()
+			} else {
+				exec.WillReturnError(tc.ErrorMock)
+				mock.ExpectRollback()
+			}
+
+			repository := domain.NewProductRepository(db, 1)
+			status := repository.RecoverProduct(datatypes.UUID(uuid.MustParse("354c6abe-89c4-46dd-b51c-d1b9c20dac4b")))
+
+			assert.NoError(t, mock.ExpectationsWereMet())
+			assert.Equal(t, tc.ExpectedStatus, status)
+		})
+	}
+}

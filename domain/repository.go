@@ -8,13 +8,9 @@ import (
 	"gorm.io/gorm"
 )
 
-const (
-	ProductTableName = "products"
-)
-
 type ProductRepository struct {
 	db           *gorm.DB
-	chunk        int // Number of records per page
+	chunk        int
 	errorHandler map[error]StatusCode
 }
 
@@ -62,7 +58,7 @@ func (r *ProductRepository) ReadProductSummaries(page int) ([]ProductSummary, St
 	offset := page * r.chunk
 
 	// Fetch the data with the calculated offset and limit
-	result := r.db.Model(&Product{}).
+	result := r.db.Table(Product{}.TableName()).
 		Select("id, name, thumbnail_url, category_name, cent_price, in_stock, rating, amount_sold, created_at").
 		Offset(offset).
 		Limit(r.chunk).
@@ -74,8 +70,7 @@ func (r *ProductRepository) ReadProductSummaries(page int) ([]ProductSummary, St
 // ReadProductDetail fetches detailed information for a specific product by its ID.
 func (r *ProductRepository) ReadProductDetail(productID datatypes.UUID) (ProductDetail, StatusCode) {
 	var detail ProductDetail
-	result := r.db.Model(&Product{}).
-		Unscoped().
+	result := r.db.Table(Product{}.TableName()).
 		Select("id, name, category_name, description, price, rating, attributes, options, main_option, created_at").
 		Where("id = ?", productID).
 		Take(&detail)
@@ -90,8 +85,7 @@ func (r *ProductRepository) ReadCategories(page int) ([]string, StatusCode) {
 	// Calculate the actual offset based on the page number and chunk size
 	offset := page * r.chunk
 
-	result := r.db.Model(&Product{}).
-		Unscoped().
+	result := r.db.Table(Product{}.TableName()).
 		Distinct("category_name").
 		Limit(r.chunk).
 		Offset(offset).
@@ -103,22 +97,31 @@ func (r *ProductRepository) ReadCategories(page int) ([]string, StatusCode) {
 // WriteProduct creates a new product in the database.
 func (r *ProductRepository) WriteProduct(product *Product) StatusCode {
 	product.ID = datatypes.UUID(uuid.New())
-	result := r.db.Model(&Product{}).Create(product)
+	result := r.db.Table(Product{}.TableName()).Create(product)
 	return r.handleError(result.Error)
 }
 
 // UpdateProduct updates an existing product by its ID.
 func (r *ProductRepository) UpdateProduct(productID datatypes.UUID, product Product) StatusCode {
-	result := r.db.Model(&Product{}).
+	result := r.db.Table(Product{}.TableName()).
 		Where("id = ?", productID).
 		Updates(product)
 	return r.handleError(result.Error)
 }
 
-// DeleteProduct deletes a product by its ID.
+// DeleteProduct soft deletes a product by its ID.
 func (r *ProductRepository) DeleteProduct(productID datatypes.UUID) StatusCode {
-	result := r.db.Model(&Product{}).
+	result := r.db.Table(Product{}.TableName()).
 		Where("id = ?", productID).
 		Delete(&Product{})
+	return r.handleError(result.Error)
+}
+
+// RecoverProduct updates deleted_at on a product by its ID.
+func (r *ProductRepository) RecoverProduct(productID datatypes.UUID) StatusCode {
+	result := r.db.Table(Product{}.TableName()).
+		Unscoped().
+		Where("id = ?", productID).
+		Update("deleted_at", nil)
 	return r.handleError(result.Error)
 }
