@@ -32,14 +32,15 @@ message Product {
   string name = 1; // Name of the product
   string thumbnail_url = 2; // URL of the thumbnail image
   string category_name = 3; // Name of the category
-  uint32 cent_price = 4; // Price in cents (e.g., 5000 for $50.00)
-  bool in_stock = 5; // Availability status
-  float rating = 6; // Product rating (e.g., 4.5)
-  uint32 amount_sold = 7; // Number of units sold
-  MainOption main_option = 8; // Main option (e.g., color with images)
-  OptionList options = 9; // option list (e.g., size, material)
-  google.protobuf.Struct attributes = 10; // size chart, material, etc. 
-  google.protobuf.Timestamp created_at = 11; // Database timestamp
+  string description= 4; // Product description
+  uint32 cent_price = 5; // Price in cents (e.g., 5000 for $50.00)
+  bool in_stock = 6; // Availability status
+  float rating = 7; // Product rating (e.g., 4.5)
+  uint32 amount_sold = 8; // Number of units sold
+  MainOption main_option = 9; // Main option (e.g., color with images)
+  OptionList options = 10; // option list (e.g., size, material)
+  google.protobuf.Struct attributes = 11; // size chart, material, etc. 
+  google.protobuf.Timestamp created_at = 12; // Database timestamp
 }
 
 // Request to write a product.
@@ -73,6 +74,16 @@ message DeleteProductResponse {
   bool success = 1; // Indicates whether the deletion was successful
 }
 
+// Request to delete a product.
+message RecoverProductRequest {
+  string id = 1; // ID of the product to delete
+}
+
+// Response for deleting a product.
+message RecoverProductResponse {
+  bool success = 1; // Indicates whether the deletion was successful
+}
+
 // Represents a summary of a product.
 message Summary {
   string id = 1; // Unique identifier for the product
@@ -88,14 +99,12 @@ message Summary {
 
 // Request to list products.
 message ListSummariesRequest {
-  int32 page_size = 1; // Number of products to return per chunk
-  string page_token = 2; // Token for pagination (e.g., next chunk)
+
 }
 
 // Response for listing products (streamed).
 message ListSummariesResponse {
   repeated Summary products = 1; // List of product summaries in this chunk
-  string next_page_token = 2; // Token for the next chunk of results
 }
 
 // Request to get product details.
@@ -119,21 +128,19 @@ message Detail {
 
 // Request to list categories.
 message ListCategoriesRequest {
-  int32 page_size = 1; // Number of categories to return per chunk
-  string page_token = 2; // Token for pagination (e.g., next chunk)
+
 }
 
 // Response for listing categories (streamed).
 message ListCategoriesResponse {
   repeated string categories = 1; // List of category names in this chunk
-  string next_page_token = 2; // Token for the next chunk of results
 }
 
 // Service for reading product data with streaming support.
 service ProductReadService {
-  rpc ListProducts(ListSummariesRequest) returns (stream ListSummariesResponse);
+  rpc ListProducts(ListSummariesRequest) returns (ListSummariesResponse);
   rpc GetProduct(GetDetailRequest) returns (Detail);
-  rpc ListCategories(ListCategoriesRequest) returns (stream ListCategoriesResponse);
+  rpc ListCategories(ListCategoriesRequest) returns (ListCategoriesResponse);
 }
 
 // Service for writing, updating, and deleting products.
@@ -141,4 +148,5 @@ service ProductWriteService {
   rpc WriteProduct(WriteProductRequest) returns (WriteProductResponse);
   rpc UpdateProduct(UpdateProductRequest) returns (UpdateProductResponse);
   rpc DeleteProduct(DeleteProductRequest) returns (DeleteProductResponse);
+  rpc RecoverProduct(RecoverProductRequest) returns (RecoverProductResponse);
 }

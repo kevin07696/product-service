@@ -1,6 +1,7 @@
 package domain_test
 
 import (
+	"context"
 	"database/sql/driver"
 	"errors"
 	"log"
@@ -59,7 +60,7 @@ func TestTableMigration(t *testing.T) {
 	}
 
 	db, mock := SetupMockDB(t)
-	repository := domain.NewProductRepository(db, 1)
+	repository := domain.NewProductRepository(db)
 
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
@@ -103,70 +104,54 @@ func TestProductRepository_ReadProductSummaries(t *testing.T) {
 
 	testCases := []struct {
 		Name           string
-		Page           int
 		Rows           [][]driver.Value
-		Arguments      []driver.Value
 		ErrorMock      error
 		ExpectedStatus domain.StatusCode
 	}{
 		{
-			Name: "Page0_ReadSummariesSucceeds",
-			Page: 0,
+			Name: "ReadSummariesSucceeds",
 			Rows: [][]driver.Value{
 				{summary.ID, summary.Name, summary.ThumbnailUrl, summary.CategoryName, summary.CentPrice, summary.InStock, summary.Rating, summary.AmountSold, summary.CreatedAt},
 				{uuid.New(), "Product 2", "https://example.com/2.jpg", "Category B", 2000, false, .80, 50, time.Now()},
 			},
-			Arguments:      []driver.Value{10},
-			ErrorMock:      nil,
-			ExpectedStatus: domain.StatusOK,
-		},
-		{
-			Name: "Page1_ReadSummariesSucceeds",
-			Page: 1,
-			Rows: [][]driver.Value{
-				{summary.ID, summary.Name, summary.ThumbnailUrl, summary.CategoryName, summary.CentPrice, summary.InStock, summary.Rating, summary.AmountSold, summary.CreatedAt},
-				{uuid.New(), "Product 2", "https://example.com/2.jpg", "Category B", 2000, false, .80, 50, time.Now()},
-			},
-			Arguments:      []driver.Value{10, 10},
 			ErrorMock:      nil,
 			ExpectedStatus: domain.StatusOK,
 		},
 		{
 			Name:           "Page1_ReadFails_ReturnsNotFound",
-			Page:           1,
 			Rows:           [][]driver.Value{},
-			Arguments:      []driver.Value{10, 10},
 			ErrorMock:      gorm.ErrRecordNotFound,
 			ExpectedStatus: domain.StatusNotFound,
 		},
 		{
 			Name:           "Page1_ReadFails_ReturnsUnknown",
-			Page:           1,
 			Rows:           [][]driver.Value{},
-			Arguments:      []driver.Value{10, 10},
 			ErrorMock:      errors.New("Unknown Error"),
-			ExpectedStatus: domain.StatusInternal,
+			ExpectedStatus: domain.StatusInternalError,
 		},
 	}
 
 	db, mock := SetupMockDB(t)
-	repo := domain.NewProductRepository(db, 10)
+	repo := domain.NewProductRepository(db)
 
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
 			// Mock the query for product summaries.
-			rows := sqlmock.NewRows([]string{"id", "name", "thumbnail_url", "category_name", "cent_price", "in_stock", "rating", "amount_sold", "created_at"}).
-				AddRows(tc.Rows...)
+			query := mock.ExpectQuery(`SELECT .* FROM "products"`).WithoutArgs()
 
-			mock.ExpectQuery(`SELECT .* FROM "products" LIMIT .*`).
-				WithArgs(tc.Arguments...).WillReturnRows(rows)
-
+			if tc.ErrorMock == nil {
+				rows := sqlmock.NewRows([]string{"id", "name", "thumbnail_url", "category_name", "cent_price", "in_stock", "rating", "amount_sold", "created_at"}).
+					AddRows(tc.Rows...)
+				query.WillReturnRows(rows)
+			} else {
+				query.WillReturnError(tc.ErrorMock)
+			}
 			// Run the query for product summaries.
-			summaries, status := repo.ReadProductSummaries(tc.Page)
+			summaries, status := repo.ReadProductSummaries(context.TODO())
 
 			// Verify that the query was executed
-			assert.Equal(t, domain.StatusOK, status, "Status should be OK")
-			assert.Equal(t, len(tc.Rows), len(summaries), "Expected 2 product summaries")
+			assert.Equal(t, tc.ExpectedStatus, status)
+			assert.Equal(t, len(tc.Rows), len(summaries))
 			if len(tc.Rows) > 0 {
 				assert.Equal(t, summary, summaries[0], "Product Summary should match")
 			}
@@ -216,12 +201,12 @@ func TestProductRepository_ReadProductDetail(t *testing.T) {
 			ProductID:      datatypes.UUID(uuid.New()),
 			Row:            []driver.Value{},
 			ErrorMock:      errors.New("Unknown Error"),
-			ExpectedStatus: domain.StatusInternal,
+			ExpectedStatus: domain.StatusInternalError,
 		},
 	}
 
 	db, mock := SetupMockDB(t)
-	repo := domain.NewProductRepository(db, 10)
+	repo := domain.NewProductRepository(db)
 
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
@@ -238,7 +223,7 @@ func TestProductRepository_ReadProductDetail(t *testing.T) {
 			}
 
 			// Run the query for product response.
-			response, status := repo.ReadProductDetail(tc.ProductID)
+			response, status := repo.ReadProductDetail(context.TODO(), tc.ProductID)
 
 			// Verify that the query was executed
 			if tc.ErrorMock == nil {
@@ -255,64 +240,52 @@ func TestProductRepository_ReadProductDetail(t *testing.T) {
 func TestProductRepository_ReadCategories(t *testing.T) {
 	testCases := []struct {
 		Name           string
-		Page           int
 		Rows           [][]driver.Value
-		Arguments      []driver.Value
 		ErrorMock      error
 		ExpectedStatus domain.StatusCode
 	}{
 		{
-			Name:           "Page0_ReadCategoriesSucceeds",
-			Page:           0,
+			Name:           "Succeeds",
 			Rows:           [][]driver.Value{{"Category A"}, {"Category B"}, {"Category C"}},
-			Arguments:      []driver.Value{10},
 			ErrorMock:      nil,
 			ExpectedStatus: domain.StatusOK,
 		},
 		{
-			Name:           "Page1_ReadCategoriesSucceeds",
-			Page:           1,
-			Rows:           [][]driver.Value{{"Category A"}, {"Category B"}, {"Category C"}},
-			Arguments:      []driver.Value{10, 10},
-			ErrorMock:      nil,
-			ExpectedStatus: domain.StatusOK,
-		},
-		{
-			Name:           "Page1_ReadFails_ReturnsNotFound",
-			Page:           1,
+			Name:           "Fails_ReturnsNotFound",
 			Rows:           [][]driver.Value{},
-			Arguments:      []driver.Value{10, 10},
 			ErrorMock:      gorm.ErrRecordNotFound,
 			ExpectedStatus: domain.StatusNotFound,
 		},
 		{
-			Name:           "Page1_ReadFails_ReturnsUnknown",
-			Page:           1,
+			Name:           "Fails_ReturnsUnknown",
 			Rows:           [][]driver.Value{},
-			Arguments:      []driver.Value{10, 10},
 			ErrorMock:      errors.New("Unknown Error"),
-			ExpectedStatus: domain.StatusInternal,
+			ExpectedStatus: domain.StatusInternalError,
 		},
 	}
 
 	db, mock := SetupMockDB(t)
-	repo := domain.NewProductRepository(db, 10)
+	repo := domain.NewProductRepository(db)
 
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
 			// Mock the query for product summaries.
-			rows := sqlmock.NewRows([]string{"category_name"}).
-				AddRows(tc.Rows...)
+			query := mock.ExpectQuery(`SELECT DISTINCT category_name FROM "products"`).WithoutArgs()
 
-			mock.ExpectQuery(`SELECT DISTINCT category_name FROM "products" LIMIT .*`).
-				WithArgs(tc.Arguments...).WillReturnRows(rows)
+			if tc.ErrorMock == nil {
+				rows := sqlmock.NewRows([]string{"category_name"}).
+					AddRows(tc.Rows...)
+				query.WillReturnRows(rows)
+			} else {
+				query.WillReturnError(tc.ErrorMock)
+			}
 
 			// Run the query for product categories.
-			categories, status := repo.ReadCategories(tc.Page)
+			categories, status := repo.ReadCategories(context.TODO())
 
 			// Verify that the query was executed
-			assert.Equal(t, domain.StatusOK, status, "Status should be OK")
-			assert.Equal(t, len(tc.Rows), len(categories), "Expected 2 product summaries")
+			assert.Equal(t, tc.ExpectedStatus, status)
+			assert.Equal(t, len(tc.Rows), len(categories))
 
 			// Ensure all expectations were met.
 			assert.NoError(t, mock.ExpectationsWereMet(), "All expectations should be met")
@@ -351,12 +324,12 @@ func TestWriteProduct(t *testing.T) {
 		{
 			Name:         "Fails_ReturnsDuplicateKey",
 			ErrorMock:    gorm.ErrDuplicatedKey,
-			ExpectStatus: domain.StatusDuplicateKey,
+			ExpectStatus: domain.StatusAlreadyExists,
 		},
 		{
 			Name:         "FailsUnexpectedly_ReturnsInternal",
 			ErrorMock:    errors.New("Unexpected Error"),
-			ExpectStatus: domain.StatusInternal,
+			ExpectStatus: domain.StatusInternalError,
 		},
 	}
 
@@ -381,8 +354,8 @@ func TestWriteProduct(t *testing.T) {
 			}
 
 			// call function
-			repository := domain.NewProductRepository(db, 1)
-			status := repository.WriteProduct(&product)
+			repository := domain.NewProductRepository(db)
+			status := repository.WriteProduct(context.TODO(), &product)
 
 			// assert function expectations
 			assert.Equal(t, tc.ExpectStatus, status)
@@ -425,7 +398,7 @@ func TestUpdateProduct(t *testing.T) {
 			ExpectedExecution: `UPDATE "products" SET "updated_at"=\$1,"name"=\$2 WHERE id = \$3 AND "products"."deleted_at" IS NULL`,
 			ExpectedArguments: []driver.Value{sqlmock.AnyArg(), product.Name, "e838ab0e-d398-42a1-8acf-f3b8f6330812"},
 			ErrorMock:         gorm.ErrDuplicatedKey,
-			ExpectedStatus:    domain.StatusDuplicateKey,
+			ExpectedStatus:    domain.StatusAlreadyExists,
 		},
 	}
 
@@ -444,8 +417,8 @@ func TestUpdateProduct(t *testing.T) {
 				mock.ExpectRollback()
 			}
 
-			repository := domain.NewProductRepository(db, 1)
-			status := repository.UpdateProduct(datatypes.UUID(uuid.MustParse(tc.ProductId)), tc.ProductUpdates)
+			repository := domain.NewProductRepository(db)
+			status := repository.UpdateProduct(context.TODO(), datatypes.UUID(uuid.MustParse(tc.ProductId)), tc.ProductUpdates)
 
 			assert.NoError(t, mock.ExpectationsWereMet())
 			assert.Equal(t, tc.ExpectedStatus, status)
@@ -466,7 +439,7 @@ func TestDeleteProduct(t *testing.T) {
 		{
 			Name:           "Fail_ReturnsInternal",
 			ErrorMock:      errors.New(""),
-			ExpectedStatus: domain.StatusInternal,
+			ExpectedStatus: domain.StatusInternalError,
 		},
 	}
 
@@ -489,8 +462,8 @@ func TestDeleteProduct(t *testing.T) {
 				mock.ExpectRollback()
 			}
 
-			repository := domain.NewProductRepository(db, 1)
-			status := repository.DeleteProduct(productId)
+			repository := domain.NewProductRepository(db)
+			status := repository.DeleteProduct(context.TODO(), productId)
 
 			assert.Equal(t, tc.ExpectedStatus, status)
 			assert.NoError(t, mock.ExpectationsWereMet())
@@ -515,7 +488,7 @@ func TestRecoverProduct(t *testing.T) {
 			Name:           "Fails_ReturnUnknown",
 			ProductId:      "354c6abe-89c4-46dd-b51c-d1b9c20dac4b",
 			ErrorMock:      errors.New("Unknown Error"),
-			ExpectedStatus: domain.StatusInternal,
+			ExpectedStatus: domain.StatusInternalError,
 		},
 	}
 
@@ -535,8 +508,8 @@ func TestRecoverProduct(t *testing.T) {
 				mock.ExpectRollback()
 			}
 
-			repository := domain.NewProductRepository(db, 1)
-			status := repository.RecoverProduct(datatypes.UUID(uuid.MustParse("354c6abe-89c4-46dd-b51c-d1b9c20dac4b")))
+			repository := domain.NewProductRepository(db)
+			status := repository.RecoverProduct(context.TODO(), datatypes.UUID(uuid.MustParse("354c6abe-89c4-46dd-b51c-d1b9c20dac4b")))
 
 			assert.NoError(t, mock.ExpectationsWereMet())
 			assert.Equal(t, tc.ExpectedStatus, status)

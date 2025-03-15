@@ -30,9 +30,9 @@ const (
 //
 // Service for reading product data with streaming support.
 type ProductReadServiceClient interface {
-	ListProducts(ctx context.Context, in *ListSummariesRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ListSummariesResponse], error)
+	ListProducts(ctx context.Context, in *ListSummariesRequest, opts ...grpc.CallOption) (*ListSummariesResponse, error)
 	GetProduct(ctx context.Context, in *GetDetailRequest, opts ...grpc.CallOption) (*Detail, error)
-	ListCategories(ctx context.Context, in *ListCategoriesRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ListCategoriesResponse], error)
+	ListCategories(ctx context.Context, in *ListCategoriesRequest, opts ...grpc.CallOption) (*ListCategoriesResponse, error)
 }
 
 type productReadServiceClient struct {
@@ -43,24 +43,15 @@ func NewProductReadServiceClient(cc grpc.ClientConnInterface) ProductReadService
 	return &productReadServiceClient{cc}
 }
 
-func (c *productReadServiceClient) ListProducts(ctx context.Context, in *ListSummariesRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ListSummariesResponse], error) {
+func (c *productReadServiceClient) ListProducts(ctx context.Context, in *ListSummariesRequest, opts ...grpc.CallOption) (*ListSummariesResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &ProductReadService_ServiceDesc.Streams[0], ProductReadService_ListProducts_FullMethodName, cOpts...)
+	out := new(ListSummariesResponse)
+	err := c.cc.Invoke(ctx, ProductReadService_ListProducts_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &grpc.GenericClientStream[ListSummariesRequest, ListSummariesResponse]{ClientStream: stream}
-	if err := x.ClientStream.SendMsg(in); err != nil {
-		return nil, err
-	}
-	if err := x.ClientStream.CloseSend(); err != nil {
-		return nil, err
-	}
-	return x, nil
+	return out, nil
 }
-
-// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type ProductReadService_ListProductsClient = grpc.ServerStreamingClient[ListSummariesResponse]
 
 func (c *productReadServiceClient) GetProduct(ctx context.Context, in *GetDetailRequest, opts ...grpc.CallOption) (*Detail, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
@@ -72,24 +63,15 @@ func (c *productReadServiceClient) GetProduct(ctx context.Context, in *GetDetail
 	return out, nil
 }
 
-func (c *productReadServiceClient) ListCategories(ctx context.Context, in *ListCategoriesRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ListCategoriesResponse], error) {
+func (c *productReadServiceClient) ListCategories(ctx context.Context, in *ListCategoriesRequest, opts ...grpc.CallOption) (*ListCategoriesResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &ProductReadService_ServiceDesc.Streams[1], ProductReadService_ListCategories_FullMethodName, cOpts...)
+	out := new(ListCategoriesResponse)
+	err := c.cc.Invoke(ctx, ProductReadService_ListCategories_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &grpc.GenericClientStream[ListCategoriesRequest, ListCategoriesResponse]{ClientStream: stream}
-	if err := x.ClientStream.SendMsg(in); err != nil {
-		return nil, err
-	}
-	if err := x.ClientStream.CloseSend(); err != nil {
-		return nil, err
-	}
-	return x, nil
+	return out, nil
 }
-
-// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type ProductReadService_ListCategoriesClient = grpc.ServerStreamingClient[ListCategoriesResponse]
 
 // ProductReadServiceServer is the server API for ProductReadService service.
 // All implementations must embed UnimplementedProductReadServiceServer
@@ -97,9 +79,9 @@ type ProductReadService_ListCategoriesClient = grpc.ServerStreamingClient[ListCa
 //
 // Service for reading product data with streaming support.
 type ProductReadServiceServer interface {
-	ListProducts(*ListSummariesRequest, grpc.ServerStreamingServer[ListSummariesResponse]) error
+	ListProducts(context.Context, *ListSummariesRequest) (*ListSummariesResponse, error)
 	GetProduct(context.Context, *GetDetailRequest) (*Detail, error)
-	ListCategories(*ListCategoriesRequest, grpc.ServerStreamingServer[ListCategoriesResponse]) error
+	ListCategories(context.Context, *ListCategoriesRequest) (*ListCategoriesResponse, error)
 	mustEmbedUnimplementedProductReadServiceServer()
 }
 
@@ -110,14 +92,14 @@ type ProductReadServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedProductReadServiceServer struct{}
 
-func (UnimplementedProductReadServiceServer) ListProducts(*ListSummariesRequest, grpc.ServerStreamingServer[ListSummariesResponse]) error {
-	return status.Errorf(codes.Unimplemented, "method ListProducts not implemented")
+func (UnimplementedProductReadServiceServer) ListProducts(context.Context, *ListSummariesRequest) (*ListSummariesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListProducts not implemented")
 }
 func (UnimplementedProductReadServiceServer) GetProduct(context.Context, *GetDetailRequest) (*Detail, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetProduct not implemented")
 }
-func (UnimplementedProductReadServiceServer) ListCategories(*ListCategoriesRequest, grpc.ServerStreamingServer[ListCategoriesResponse]) error {
-	return status.Errorf(codes.Unimplemented, "method ListCategories not implemented")
+func (UnimplementedProductReadServiceServer) ListCategories(context.Context, *ListCategoriesRequest) (*ListCategoriesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListCategories not implemented")
 }
 func (UnimplementedProductReadServiceServer) mustEmbedUnimplementedProductReadServiceServer() {}
 func (UnimplementedProductReadServiceServer) testEmbeddedByValue()                            {}
@@ -140,16 +122,23 @@ func RegisterProductReadServiceServer(s grpc.ServiceRegistrar, srv ProductReadSe
 	s.RegisterService(&ProductReadService_ServiceDesc, srv)
 }
 
-func _ProductReadService_ListProducts_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(ListSummariesRequest)
-	if err := stream.RecvMsg(m); err != nil {
-		return err
+func _ProductReadService_ListProducts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListSummariesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
 	}
-	return srv.(ProductReadServiceServer).ListProducts(m, &grpc.GenericServerStream[ListSummariesRequest, ListSummariesResponse]{ServerStream: stream})
+	if interceptor == nil {
+		return srv.(ProductReadServiceServer).ListProducts(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProductReadService_ListProducts_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProductReadServiceServer).ListProducts(ctx, req.(*ListSummariesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
-
-// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type ProductReadService_ListProductsServer = grpc.ServerStreamingServer[ListSummariesResponse]
 
 func _ProductReadService_GetProduct_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetDetailRequest)
@@ -169,16 +158,23 @@ func _ProductReadService_GetProduct_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ProductReadService_ListCategories_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(ListCategoriesRequest)
-	if err := stream.RecvMsg(m); err != nil {
-		return err
+func _ProductReadService_ListCategories_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListCategoriesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
 	}
-	return srv.(ProductReadServiceServer).ListCategories(m, &grpc.GenericServerStream[ListCategoriesRequest, ListCategoriesResponse]{ServerStream: stream})
+	if interceptor == nil {
+		return srv.(ProductReadServiceServer).ListCategories(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProductReadService_ListCategories_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProductReadServiceServer).ListCategories(ctx, req.(*ListCategoriesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
-
-// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type ProductReadService_ListCategoriesServer = grpc.ServerStreamingServer[ListCategoriesResponse]
 
 // ProductReadService_ServiceDesc is the grpc.ServiceDesc for ProductReadService service.
 // It's only intended for direct use with grpc.RegisterService,
@@ -188,29 +184,27 @@ var ProductReadService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*ProductReadServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
+			MethodName: "ListProducts",
+			Handler:    _ProductReadService_ListProducts_Handler,
+		},
+		{
 			MethodName: "GetProduct",
 			Handler:    _ProductReadService_GetProduct_Handler,
 		},
-	},
-	Streams: []grpc.StreamDesc{
 		{
-			StreamName:    "ListProducts",
-			Handler:       _ProductReadService_ListProducts_Handler,
-			ServerStreams: true,
-		},
-		{
-			StreamName:    "ListCategories",
-			Handler:       _ProductReadService_ListCategories_Handler,
-			ServerStreams: true,
+			MethodName: "ListCategories",
+			Handler:    _ProductReadService_ListCategories_Handler,
 		},
 	},
+	Streams:  []grpc.StreamDesc{},
 	Metadata: "protos/product.proto",
 }
 
 const (
-	ProductWriteService_WriteProduct_FullMethodName  = "/ProductWriteService/WriteProduct"
-	ProductWriteService_UpdateProduct_FullMethodName = "/ProductWriteService/UpdateProduct"
-	ProductWriteService_DeleteProduct_FullMethodName = "/ProductWriteService/DeleteProduct"
+	ProductWriteService_WriteProduct_FullMethodName   = "/ProductWriteService/WriteProduct"
+	ProductWriteService_UpdateProduct_FullMethodName  = "/ProductWriteService/UpdateProduct"
+	ProductWriteService_DeleteProduct_FullMethodName  = "/ProductWriteService/DeleteProduct"
+	ProductWriteService_RecoverProduct_FullMethodName = "/ProductWriteService/RecoverProduct"
 )
 
 // ProductWriteServiceClient is the client API for ProductWriteService service.
@@ -222,6 +216,7 @@ type ProductWriteServiceClient interface {
 	WriteProduct(ctx context.Context, in *WriteProductRequest, opts ...grpc.CallOption) (*WriteProductResponse, error)
 	UpdateProduct(ctx context.Context, in *UpdateProductRequest, opts ...grpc.CallOption) (*UpdateProductResponse, error)
 	DeleteProduct(ctx context.Context, in *DeleteProductRequest, opts ...grpc.CallOption) (*DeleteProductResponse, error)
+	RecoverProduct(ctx context.Context, in *RecoverProductRequest, opts ...grpc.CallOption) (*RecoverProductResponse, error)
 }
 
 type productWriteServiceClient struct {
@@ -262,6 +257,16 @@ func (c *productWriteServiceClient) DeleteProduct(ctx context.Context, in *Delet
 	return out, nil
 }
 
+func (c *productWriteServiceClient) RecoverProduct(ctx context.Context, in *RecoverProductRequest, opts ...grpc.CallOption) (*RecoverProductResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RecoverProductResponse)
+	err := c.cc.Invoke(ctx, ProductWriteService_RecoverProduct_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ProductWriteServiceServer is the server API for ProductWriteService service.
 // All implementations must embed UnimplementedProductWriteServiceServer
 // for forward compatibility.
@@ -271,6 +276,7 @@ type ProductWriteServiceServer interface {
 	WriteProduct(context.Context, *WriteProductRequest) (*WriteProductResponse, error)
 	UpdateProduct(context.Context, *UpdateProductRequest) (*UpdateProductResponse, error)
 	DeleteProduct(context.Context, *DeleteProductRequest) (*DeleteProductResponse, error)
+	RecoverProduct(context.Context, *RecoverProductRequest) (*RecoverProductResponse, error)
 	mustEmbedUnimplementedProductWriteServiceServer()
 }
 
@@ -289,6 +295,9 @@ func (UnimplementedProductWriteServiceServer) UpdateProduct(context.Context, *Up
 }
 func (UnimplementedProductWriteServiceServer) DeleteProduct(context.Context, *DeleteProductRequest) (*DeleteProductResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteProduct not implemented")
+}
+func (UnimplementedProductWriteServiceServer) RecoverProduct(context.Context, *RecoverProductRequest) (*RecoverProductResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RecoverProduct not implemented")
 }
 func (UnimplementedProductWriteServiceServer) mustEmbedUnimplementedProductWriteServiceServer() {}
 func (UnimplementedProductWriteServiceServer) testEmbeddedByValue()                             {}
@@ -365,6 +374,24 @@ func _ProductWriteService_DeleteProduct_Handler(srv interface{}, ctx context.Con
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ProductWriteService_RecoverProduct_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RecoverProductRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProductWriteServiceServer).RecoverProduct(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProductWriteService_RecoverProduct_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProductWriteServiceServer).RecoverProduct(ctx, req.(*RecoverProductRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ProductWriteService_ServiceDesc is the grpc.ServiceDesc for ProductWriteService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -383,6 +410,10 @@ var ProductWriteService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteProduct",
 			Handler:    _ProductWriteService_DeleteProduct_Handler,
+		},
+		{
+			MethodName: "RecoverProduct",
+			Handler:    _ProductWriteService_RecoverProduct_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

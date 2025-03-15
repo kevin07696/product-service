@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"context"
 	"log/slog"
 
 	"github.com/google/uuid"
@@ -10,17 +11,15 @@ import (
 
 type ProductRepository struct {
 	db           *gorm.DB
-	chunk        int
 	errorHandler map[error]StatusCode
 }
 
-func NewProductRepository(db *gorm.DB, chunk int) *ProductRepository {
+func NewProductRepository(db *gorm.DB) *ProductRepository {
 	return &ProductRepository{
-		db:    db,
-		chunk: chunk,
+		db: db,
 		errorHandler: map[error]StatusCode{
 			gorm.ErrRecordNotFound: StatusNotFound,
-			gorm.ErrDuplicatedKey:  StatusDuplicateKey,
+			gorm.ErrDuplicatedKey:  StatusAlreadyExists,
 		},
 	}
 }
@@ -44,33 +43,28 @@ func (r *ProductRepository) handleError(err error) StatusCode {
 
 	status, ok := r.errorHandler[err]
 	if !ok {
-		return StatusInternal
+		return StatusInternalError
 	}
 	return status
 }
 
 // ReadProductSummaries fetches a paginated list of product summaries.
 // The `offset` parameter is treated as a page number (starting from 0).
-func (r *ProductRepository) ReadProductSummaries(page int) ([]ProductSummary, StatusCode) {
+func (r *ProductRepository) ReadProductSummaries(ctx context.Context) ([]ProductSummary, StatusCode) {
 	var summaries []ProductSummary
 
-	// Calculate the offset based on the page number and chunk size
-	offset := page * r.chunk
-
 	// Fetch the data with the calculated offset and limit
-	result := r.db.Table(Product{}.TableName()).
+	result := r.db.Table(Product{}.TableName()).WithContext(ctx).
 		Select("id, name, thumbnail_url, category_name, cent_price, in_stock, rating, amount_sold, created_at").
-		Offset(offset).
-		Limit(r.chunk).
 		Find(&summaries)
 
 	return summaries, r.handleError(result.Error)
 }
 
 // ReadProductDetail fetches detailed information for a specific product by its ID.
-func (r *ProductRepository) ReadProductDetail(productID datatypes.UUID) (ProductDetail, StatusCode) {
+func (r *ProductRepository) ReadProductDetail(ctx context.Context, productID datatypes.UUID) (ProductDetail, StatusCode) {
 	var detail ProductDetail
-	result := r.db.Table(Product{}.TableName()).
+	result := r.db.Table(Product{}.TableName()).WithContext(ctx).
 		Select("id, name, category_name, description, price, rating, attributes, options, main_option, created_at").
 		Where("id = ?", productID).
 		Take(&detail)
@@ -79,47 +73,43 @@ func (r *ProductRepository) ReadProductDetail(productID datatypes.UUID) (Product
 
 // ReadCategories fetches a paginated list of distinct product categories.
 // The `offset` parameter is treated as a page number (starting from 0).
-func (r *ProductRepository) ReadCategories(page int) ([]string, StatusCode) {
+func (r *ProductRepository) ReadCategories(ctx context.Context) ([]string, StatusCode) {
 	var categories []string
 
-	// Calculate the actual offset based on the page number and chunk size
-	offset := page * r.chunk
-
-	result := r.db.Table(Product{}.TableName()).
+	result := r.db.Table(Product{}.TableName()).WithContext(ctx).
 		Distinct("category_name").
-		Limit(r.chunk).
-		Offset(offset).
 		Pluck("category_name", &categories)
 
 	return categories, r.handleError(result.Error)
 }
 
 // WriteProduct creates a new product in the database.
-func (r *ProductRepository) WriteProduct(product *Product) StatusCode {
+func (r *ProductRepository) WriteProduct(ctx context.Context, product *Product) StatusCode {
 	product.ID = datatypes.UUID(uuid.New())
-	result := r.db.Table(Product{}.TableName()).Create(product)
+	result := r.db.Table(Product{}.TableName()).WithContext(ctx).Create(product)
 	return r.handleError(result.Error)
 }
 
-// UpdateProduct updates an existing product by its ID.
-func (r *ProductRepository) UpdateProduct(productID datatypes.UUID, product Product) StatusCode {
-	result := r.db.Table(Product{}.TableName()).
+// UpdateProduct updates multiple fields for an existing product by its ID.
+// Zero value fields are not added to the mutation.
+func (r *ProductRepository) UpdateProduct(ctx context.Context, productID datatypes.UUID, product Product) StatusCode {
+	result := r.db.Table(Product{}.TableName()).WithContext(ctx).
 		Where("id = ?", productID).
 		Updates(product)
 	return r.handleError(result.Error)
 }
 
 // DeleteProduct soft deletes a product by its ID.
-func (r *ProductRepository) DeleteProduct(productID datatypes.UUID) StatusCode {
-	result := r.db.Table(Product{}.TableName()).
+func (r *ProductRepository) DeleteProduct(ctx context.Context, productID datatypes.UUID) StatusCode {
+	result := r.db.Table(Product{}.TableName()).WithContext(ctx).
 		Where("id = ?", productID).
 		Delete(&Product{})
 	return r.handleError(result.Error)
 }
 
 // RecoverProduct updates deleted_at on a product by its ID.
-func (r *ProductRepository) RecoverProduct(productID datatypes.UUID) StatusCode {
-	result := r.db.Table(Product{}.TableName()).
+func (r *ProductRepository) RecoverProduct(ctx context.Context, productID datatypes.UUID) StatusCode {
+	result := r.db.Table(Product{}.TableName()).WithContext(ctx).
 		Unscoped().
 		Where("id = ?", productID).
 		Update("deleted_at", nil)
