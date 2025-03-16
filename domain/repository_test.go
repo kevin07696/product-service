@@ -118,13 +118,13 @@ func TestProductRepository_ReadProductSummaries(t *testing.T) {
 			ExpectedStatus: domain.StatusOK,
 		},
 		{
-			Name:           "Page1_ReadFails_ReturnsNotFound",
+			Name:           "ReadFails_ReturnsNotFound",
 			Rows:           [][]driver.Value{},
 			ErrorMock:      gorm.ErrRecordNotFound,
 			ExpectedStatus: domain.StatusNotFound,
 		},
 		{
-			Name:           "Page1_ReadFails_ReturnsUnknown",
+			Name:           "ReadFails_ReturnsUnknown",
 			Rows:           [][]driver.Value{},
 			ErrorMock:      errors.New("Unknown Error"),
 			ExpectedStatus: domain.StatusInternalError,
@@ -137,7 +137,7 @@ func TestProductRepository_ReadProductSummaries(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
 			// Mock the query for product summaries.
-			query := mock.ExpectQuery(`SELECT .* FROM "products"`).WithoutArgs()
+			query := mock.ExpectQuery(`SELECT .* FROM "products" WHERE category_name <> \$1`).WithArgs("Archived")
 
 			if tc.ErrorMock == nil {
 				rows := sqlmock.NewRows([]string{"id", "name", "thumbnail_url", "category_name", "cent_price", "in_stock", "rating", "amount_sold", "created_at"}).
@@ -211,8 +211,8 @@ func TestProductRepository_ReadProductDetail(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
 			// Mock the query for product summaries.
-			query := mock.ExpectQuery(`SELECT .* FROM "products" WHERE id = \$1 LIMIT \$2`).
-				WithArgs(tc.ProductID, 1)
+			query := mock.ExpectQuery(`SELECT .* FROM "products" WHERE id = \$1 AND category_name <> \$2 LIMIT \$3`).
+				WithArgs(tc.ProductID, "Archived", 1)
 
 			if tc.ErrorMock == nil {
 				rows := mock.NewRows([]string{"id", "name", "category_name", "description", "cent_price", "rating", "attributes", "options", "main_option", "created_at"}).
@@ -270,7 +270,7 @@ func TestProductRepository_ReadCategories(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
 			// Mock the query for product summaries.
-			query := mock.ExpectQuery(`SELECT DISTINCT category_name FROM "products"`).WithoutArgs()
+			query := mock.ExpectQuery(`SELECT DISTINCT category_name FROM "products" WHERE category_name <> \$1`).WithArgs("Archived")
 
 			if tc.ErrorMock == nil {
 				rows := sqlmock.NewRows([]string{"category_name"}).

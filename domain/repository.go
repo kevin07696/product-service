@@ -83,6 +83,18 @@ func (r *ProductRepository) ReadProductDetail(ctx context.Context, productID dat
 	return detail, r.handleError(ctx, "Failed to read product detail", result.Error, slog.String("product_id", productID.String()))
 }
 
+// ReadCategories fetches all distinct unscoped product categories.
+func (r *ProductRepository) ReadUnscopedCategories(ctx context.Context) ([]string, StatusCode) {
+	var categories []string
+
+	result := r.db.Table(Product{}.TableName()).WithContext(ctx).
+		Unscoped().
+		Distinct("category_name").
+		Pluck("category_name", &categories)
+
+	return categories, r.handleError(ctx, "Failed to read unscoped categories", result.Error)
+}
+
 // ReadCategories fetches all distinct product categories.
 func (r *ProductRepository) ReadCategories(ctx context.Context) ([]string, StatusCode) {
 	var categories []string
