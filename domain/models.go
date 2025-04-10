@@ -8,7 +8,7 @@ import (
 )
 
 type Model struct {
-	ID        datatypes.UUID `gorm:"type:uuid;primaryKey"`
+	ID        datatypes.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"` // generate uuid is not supported on SQLite
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	DeletedAt gorm.DeletedAt `gorm:"index"`

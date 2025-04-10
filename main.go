@@ -28,7 +28,7 @@ func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	slog.SetDefault(logger)
 
-	db := adapters.InitInMemoryDatabase()
+	db := adapters.InitDatabase()
 
 	repository = domain.NewProductRepository(db)
 	repository.Migrate()
