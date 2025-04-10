@@ -5,16 +5,16 @@ import "google/protobuf/timestamp.proto";
 
 option go_package = "./generated";
 
-// Represents an item in a main option (e.g., a color option with images).
-message MainOptionItem {
+// Represents an item in a gallery option (e.g., a color option with images).
+message GalleryOption {
   string value = 1; // Value of the option (e.g., "blue", "medium")
   repeated string image_urls = 2; // List of associated image URLs
 }
 
-// Represents a main option with multiple options.
-message MainOption {
+// Represents a gallery option with multiple options.
+message GalleryOptions {
   string name = 1; // Name of the option (e.g., "color")
-  repeated MainOptionItem options = 2; // List of options
+  repeated GalleryOption options = 2; // List of options
 }
 
 // Represents a regular option (e.g., size or material).
@@ -23,7 +23,7 @@ message Option {
   repeated string options = 2; // List of options
 }
 
-message OptionList {
+message Options {
   repeated Option options = 1;
 }
 
@@ -37,8 +37,8 @@ message Product {
   bool in_stock = 6; // Availability status
   float rating = 7; // Product rating (e.g., 4.5)
   uint32 amount_sold = 8; // Number of units sold
-  MainOption main_option = 9; // Main option (e.g., color with images)
-  OptionList options = 10; // option list (e.g., size, material)
+  GalleryOption gallery_option = 9; // Gallery option (e.g., color with images)
+  Options options = 10; // option list (e.g., size, material)
   google.protobuf.Struct attributes = 11; // size chart, material, etc. 
   google.protobuf.Timestamp created_at = 12; // Database timestamp
 }
@@ -120,7 +120,7 @@ message Detail {
   string description = 4; // Description of the product
   uint32 cent_price = 5; // Price in cents (e.g., 5000 for $50.00)
   float rating = 6; // Product rating (e.g., 4.5)
-  MainOption main_option = 7; // Main option (e.g., color with images)
+  GalleryOption gallery_option = 7; // Gallery option (e.g., color with images)
   repeated Option options = 8; // option List (e.g., size, material)
   google.protobuf.Struct attributes = 9; // size chart, material, etc. 
   google.protobuf.Timestamp created_at = 10; // Database timestamp
@@ -136,11 +136,20 @@ message ListCategoriesResponse {
   repeated string categories = 1; // List of category names in this chunk
 }
 
+message ListProductsRequest {
+
+}
+
+message ListProductsResponse {
+  repeated Product products = 1;
+}
+
 // Service for reading product data with streaming support.
 service ProductReadService {
-  rpc ListProducts(ListSummariesRequest) returns (ListSummariesResponse);
-  rpc GetProduct(GetDetailRequest) returns (Detail);
+  rpc ListProducts(ListProductsRequest) returns (ListProductsResponse);
   rpc ListCategories(ListCategoriesRequest) returns (ListCategoriesResponse);
+  rpc ListSummaries(ListSummariesRequest) returns (ListSummariesResponse);
+  rpc GetDetails(GetDetailRequest) returns (Detail);
 }
 
 // Service for writing, updating, and deleting products.
