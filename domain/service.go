@@ -7,7 +7,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/kevin07696/produce-service/generated"
 	"google.golang.org/protobuf/encoding/protojson"
-	"gorm.io/datatypes"
 )
 
 type ProductService struct {
@@ -57,17 +56,17 @@ func (s *ProductService) WriteProduct(ctx context.Context, request *generated.Pr
 	}
 
 	product := &Product{
-		Name:         request.Name,
-		ThumbnailUrl: request.ThumbnailUrl,
-		CategoryName: request.CategoryName,
-		Description:  request.Description,
-		CentPrice:    request.CentPrice,
-		AmountSold:   request.AmountSold,
-		InStock:      request.InStock,
-		Rating:       request.Rating,
-		Options:      options,
-		MainOption:   mainOption,
-		Attributes:   attributes,
+		Name:          request.Name,
+		ThumbnailUrl:  request.ThumbnailUrl,
+		CategoryName:  request.CategoryName,
+		Description:   request.Description,
+		CentPrice:     request.CentPrice,
+		AmountSold:    request.AmountSold,
+		InStock:       request.InStock,
+		Rating:        request.Rating,
+		Options:       options,
+		GalleryOption: mainOption,
+		Attributes:    attributes,
 	}
 
 	status := s.repo.WriteProduct(ctx, product)
@@ -142,21 +141,21 @@ func (s *ProductService) UpdateProduct(ctx context.Context, request *generated.U
 
 	// Create product model for repository update
 	product := Product{
-		Name:         request.Product.Name,
-		ThumbnailUrl: request.Product.ThumbnailUrl,
-		CategoryName: request.Product.CategoryName,
-		Description:  request.Product.Description,
-		CentPrice:    request.Product.CentPrice,
-		AmountSold:   request.Product.AmountSold,
-		InStock:      request.Product.InStock,
-		Rating:       request.Product.Rating,
-		Options:      options,
-		MainOption:   mainOption,
-		Attributes:   attributes,
+		Name:          request.Product.Name,
+		ThumbnailUrl:  request.Product.ThumbnailUrl,
+		CategoryName:  request.Product.CategoryName,
+		Description:   request.Product.Description,
+		CentPrice:     request.Product.CentPrice,
+		AmountSold:    request.Product.AmountSold,
+		InStock:       request.Product.InStock,
+		Rating:        request.Product.Rating,
+		Options:       options,
+		GalleryOption: mainOption,
+		Attributes:    attributes,
 	}
 
 	// Call repository to update the product
-	return s.repo.UpdateProduct(ctx, datatypes.UUID(productID), product)
+	return s.repo.UpdateProduct(ctx, productID, product)
 }
 
 // DeleteProduct soft deletes a product.
@@ -180,7 +179,7 @@ func (s *ProductService) DeleteProduct(ctx context.Context, request *generated.D
 		return StatusInvalidArgument
 	}
 
-	return s.repo.DeleteProduct(ctx, datatypes.UUID(productID))
+	return s.repo.DeleteProduct(ctx, productID)
 }
 
 // RecoverProduct updates a product.
@@ -204,5 +203,5 @@ func (s *ProductService) RecoverProduct(ctx context.Context, request *generated.
 		return StatusInvalidArgument
 	}
 
-	return s.repo.RecoverProduct(ctx, datatypes.UUID(productID))
+	return s.repo.RecoverProduct(ctx, productID)
 }

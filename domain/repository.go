@@ -5,7 +5,6 @@ import (
 	"log/slog"
 
 	"github.com/google/uuid"
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -73,7 +72,7 @@ func (r *ProductRepository) ReadProductSummaries(ctx context.Context) ([]Product
 }
 
 // ReadProductDetail fetches detailed information for a specific product by its ID.
-func (r *ProductRepository) ReadProductDetail(ctx context.Context, productID datatypes.UUID) (ProductDetail, StatusCode) {
+func (r *ProductRepository) ReadProductDetail(ctx context.Context, productID uuid.UUID) (ProductDetail, StatusCode) {
 	var detail ProductDetail
 	result := r.db.Table(Product{}.TableName()).WithContext(ctx).
 		Select("id, name, category_name, description, price, rating, attributes, options, main_option, created_at").
@@ -109,14 +108,14 @@ func (r *ProductRepository) ReadCategories(ctx context.Context) ([]string, Statu
 
 // WriteProduct creates a new product in the database.
 func (r *ProductRepository) WriteProduct(ctx context.Context, product *Product) StatusCode {
-	product.ID = datatypes.UUID(uuid.New())
+	product.ID = uuid.New()
 	result := r.db.Table(Product{}.TableName()).WithContext(ctx).Create(product)
 	return r.handleError(ctx, "Failed to write to product", result.Error)
 }
 
 // UpdateProduct updates multiple fields for an existing product by its ID.
 // Zero value fields are not added to the mutation.
-func (r *ProductRepository) UpdateProduct(ctx context.Context, productID datatypes.UUID, product Product) StatusCode {
+func (r *ProductRepository) UpdateProduct(ctx context.Context, productID uuid.UUID, product Product) StatusCode {
 	result := r.db.Table(Product{}.TableName()).WithContext(ctx).
 		Where("id = ?", productID).
 		Updates(product)
@@ -124,7 +123,7 @@ func (r *ProductRepository) UpdateProduct(ctx context.Context, productID datatyp
 }
 
 // DeleteProduct soft deletes a product by its ID.
-func (r *ProductRepository) DeleteProduct(ctx context.Context, productID datatypes.UUID) StatusCode {
+func (r *ProductRepository) DeleteProduct(ctx context.Context, productID uuid.UUID) StatusCode {
 	result := r.db.Table(Product{}.TableName()).WithContext(ctx).
 		Where("id = ?", productID).
 		Delete(&Product{})
@@ -132,7 +131,7 @@ func (r *ProductRepository) DeleteProduct(ctx context.Context, productID datatyp
 }
 
 // RecoverProduct updates deleted_at on a product by its ID.
-func (r *ProductRepository) RecoverProduct(ctx context.Context, productID datatypes.UUID) StatusCode {
+func (r *ProductRepository) RecoverProduct(ctx context.Context, productID uuid.UUID) StatusCode {
 	result := r.db.Table(Product{}.TableName()).WithContext(ctx).
 		Unscoped().
 		Where("id = ?", productID).

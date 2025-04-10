@@ -178,27 +178,27 @@ func TestProductRepository_ReadProductDetail(t *testing.T) {
 
 	testCases := []struct {
 		Name           string
-		ProductID      datatypes.UUID
+		ProductID      uuid.UUID
 		Row            []driver.Value
 		ErrorMock      error
 		ExpectedStatus domain.StatusCode
 	}{
 		{
 			Name:           "Succeeds",
-			ProductID:      datatypes.UUID(uuid.MustParse(detail.ID)),
+			ProductID:      uuid.MustParse(detail.ID),
 			Row:            []driver.Value{detail.ID, detail.Name, detail.CategoryName, detail.Description, detail.CentPrice, detail.Rating, detail.Attributes, detail.Options, detail.MainOption, detail.CreatedAt},
 			ExpectedStatus: domain.StatusOK,
 		},
 		{
 			Name:           "Fails_ReturnsNotFound",
-			ProductID:      datatypes.UUID(uuid.New()),
+			ProductID:      uuid.New(),
 			Row:            []driver.Value{},
 			ErrorMock:      gorm.ErrRecordNotFound,
 			ExpectedStatus: domain.StatusNotFound,
 		},
 		{
 			Name:           "Fails_ReturnsUnknown",
-			ProductID:      datatypes.UUID(uuid.New()),
+			ProductID:      uuid.New(),
 			Row:            []driver.Value{},
 			ErrorMock:      errors.New("Unknown Error"),
 			ExpectedStatus: domain.StatusInternalError,
@@ -296,19 +296,19 @@ func TestProductRepository_ReadCategories(t *testing.T) {
 func TestWriteProduct(t *testing.T) {
 	product := domain.Product{
 		Model: domain.Model{
-			ID: datatypes.UUID(uuid.New()),
+			ID: (uuid.New()),
 		},
-		Name:         "Classic Jeans",
-		ThumbnailUrl: "https://my-bucket.s3.us-east-1.amazonaws.com/images/classic-jeans.jpg",
-		Description:  "These are really nice jeans.",
-		CentPrice:    5000,
-		InStock:      true,
-		Rating:       0.75,
-		AmountSold:   6,
-		MainOption:   datatypes.JSON(`{ name: pattern, options: [ { value: Striped, image_urls: [https://example.com/striped-pattern1.jpg, https://example.com/striped-pattern2.jpg] } ] }`),
-		Options:      datatypes.JSON(`{ options: [ { name: size, options: [xs, s, m, lg] } ] }`),
-		Attributes:   datatypes.JSON(`{ attributes: { material: 100% Cotton, care_instructions: Machine wash cold. Tumble dry low., size_chart: { xs: { bust: 30-32 inches, waist: 24-26 inches, hips: 33-35 inches } } } }`),
-		CategoryName: "pants",
+		Name:          "Classic Jeans",
+		ThumbnailUrl:  "https://my-bucket.s3.us-east-1.amazonaws.com/images/classic-jeans.jpg",
+		Description:   "These are really nice jeans.",
+		CentPrice:     5000,
+		InStock:       true,
+		Rating:        0.75,
+		AmountSold:    6,
+		GalleryOption: datatypes.JSON(`{ name: pattern, options: [ { value: Striped, image_urls: [https://example.com/striped-pattern1.jpg, https://example.com/striped-pattern2.jpg] } ] }`),
+		Options:       datatypes.JSON(`{ options: [ { name: size, options: [xs, s, m, lg] } ] }`),
+		Attributes:    datatypes.JSON(`{ attributes: { material: 100% Cotton, care_instructions: Machine wash cold. Tumble dry low., size_chart: { xs: { bust: 30-32 inches, waist: 24-26 inches, hips: 33-35 inches } } } }`),
+		CategoryName:  "pants",
 	}
 
 	testCases := []struct {
@@ -343,7 +343,7 @@ func TestWriteProduct(t *testing.T) {
 
 			// Fix: Use sqlmock.AnyArg() for the ID parameter to match any UUID
 			query := mock.ExpectExec(`INSERT INTO "products" \("id","created_at","updated_at","deleted_at","name","thumbnail_url","category_name","description","cent_price","amount_sold","in_stock","rating","options","main_option","attributes"\) VALUES \(\$1,\$2,\$3,\$4,\$5,\$6,\$7,\$8,\$9,\$10,\$11,\$12,\$13,\$14,\$15\)`).
-				WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), product.Name, product.ThumbnailUrl, product.CategoryName, product.Description, product.CentPrice, product.AmountSold, product.InStock, product.Rating, product.Options, product.MainOption, product.Attributes)
+				WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), product.Name, product.ThumbnailUrl, product.CategoryName, product.Description, product.CentPrice, product.AmountSold, product.InStock, product.Rating, product.Options, product.GalleryOption, product.Attributes)
 
 			if tc.ErrorMock == nil {
 				query.WillReturnResult(sqlmock.NewResult(1, 1))
@@ -367,7 +367,7 @@ func TestWriteProduct(t *testing.T) {
 func TestUpdateProduct(t *testing.T) {
 	product := domain.Product{
 		Model: domain.Model{
-			ID: datatypes.UUID(uuid.New()),
+			ID: (uuid.New()),
 		},
 		Name:       "Product 1",
 		Attributes: datatypes.JSON(`{ attributes: { material: 100% Cotton, care_instructions: Machine wash cold. Tumble dry low., size_chart: { xs: { bust: 30-32 inches, waist: 24-26 inches, hips: 33-35 inches } } } }`),
@@ -418,7 +418,7 @@ func TestUpdateProduct(t *testing.T) {
 			}
 
 			repository := domain.NewProductRepository(db)
-			status := repository.UpdateProduct(context.TODO(), datatypes.UUID(uuid.MustParse(tc.ProductId)), tc.ProductUpdates)
+			status := repository.UpdateProduct(context.TODO(), uuid.MustParse(tc.ProductId), tc.ProductUpdates)
 
 			assert.NoError(t, mock.ExpectationsWereMet())
 			assert.Equal(t, tc.ExpectedStatus, status)
@@ -447,7 +447,7 @@ func TestDeleteProduct(t *testing.T) {
 		t.Run(tc.Name, func(t *testing.T) {
 			db, mock := SetupMockDB(t)
 
-			productId := datatypes.UUID(uuid.New())
+			productId := (uuid.New())
 
 			mock.ExpectBegin()
 
@@ -509,7 +509,7 @@ func TestRecoverProduct(t *testing.T) {
 			}
 
 			repository := domain.NewProductRepository(db)
-			status := repository.RecoverProduct(context.TODO(), datatypes.UUID(uuid.MustParse("354c6abe-89c4-46dd-b51c-d1b9c20dac4b")))
+			status := repository.RecoverProduct(context.TODO(), (uuid.MustParse("354c6abe-89c4-46dd-b51c-d1b9c20dac4b")))
 
 			assert.NoError(t, mock.ExpectationsWereMet())
 			assert.Equal(t, tc.ExpectedStatus, status)

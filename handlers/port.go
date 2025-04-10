@@ -3,14 +3,14 @@ package handlers
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/kevin07696/produce-service/domain"
 	"github.com/kevin07696/produce-service/generated"
-	"gorm.io/datatypes"
 )
 
 type Reader interface {
 	ReadProductSummaries(context.Context) ([]domain.ProductSummary, domain.StatusCode)
-	ReadProductDetail(context.Context, datatypes.UUID) (domain.ProductDetail, domain.StatusCode)
+	ReadProductDetail(context.Context, uuid.UUID) (domain.ProductDetail, domain.StatusCode)
 	ReadCategories(context.Context) ([]string, domain.StatusCode)
 }
 

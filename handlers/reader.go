@@ -10,7 +10,6 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
-	"gorm.io/datatypes"
 )
 
 type ReadProductHandler struct {
@@ -62,9 +61,7 @@ func (h ReadProductHandler) GetDetails(ctx context.Context, request *generated.G
 		return nil, h.errorHandler[domain.StatusUnauthorized]
 	}
 
-	productId := datatypes.UUID(parsedUUID)
-
-	productDetail, status := h.reader.ReadProductDetail(ctx, productId)
+	productDetail, status := h.reader.ReadProductDetail(ctx, parsedUUID)
 	if status > 0 {
 		return nil, h.errorHandler[status]
 	}
